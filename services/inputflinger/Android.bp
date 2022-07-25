@@ -41,6 +41,7 @@ cc_defaults {
         "-Wshadow-field-in-constructor-modified",
         "-Wshadow-uncaptured-local",
         "-DANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION",
+	    "-Ofast",
     ],
     sanitize: {
         misc_undefined: [
