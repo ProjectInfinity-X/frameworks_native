@@ -49,6 +49,8 @@ public:
     // onBuffersFreed is called from IGraphicBufferConsumer::discardFreeBuffers
     // to notify the producer that certain free buffers are discarded by the consumer.
     virtual void onBuffersDiscarded(const std::vector<int32_t>& slots) = 0; // Asynchronous
+
+    virtual void onBufferDetached(int slot) = 0;
 };
 
 #ifndef NO_BINDER
