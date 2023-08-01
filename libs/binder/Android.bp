@@ -396,6 +396,9 @@ cc_defaults {
         "portability*",
         "-readability-redundant-smartptr-get",
     ],
+    lto: {
+        thin: true,
+    },
 }
 
 cc_library_headers {
