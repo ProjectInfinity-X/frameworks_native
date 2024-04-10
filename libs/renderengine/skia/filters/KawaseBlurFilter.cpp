@@ -118,7 +118,7 @@ sk_sp<SkImage> KawaseBlurFilter::generate(GrRecordingContext* context,
     LOG_ALWAYS_FATAL_IF(!surface, "%s: Failed to create surface for blurring!", __func__);
     sk_sp<SkImage> tmpBlur = makeImage(surface.get(), &blurBuilder);
 
-   for (auto i = 1; i < numberOfPasses; i++) {
+   for (auto i = 2; i <= numberOfPasses; i++) {
         blurBuilder.child("child") =
                 tmpBlur->makeShader(SkTileMode::kMirror, SkTileMode::kMirror, linear);
         blurBuilder.uniform("in_blurOffset") = (float) i * radiusByPasses * kInputScale;
