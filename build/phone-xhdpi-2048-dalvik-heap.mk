@@ -17,7 +17,7 @@
 # Provides overrides to configure the Dalvik heap for a 2GB phone
 # 192m of RAM gives enough space for 5 8 megapixel camera bitmaps in RAM.
 
-PRODUCT_VENDOR_PROPERTIES += \
+PRODUCT_PROPERTY_OVERRIDES += \
     dalvik.vm.heapstartsize?=8m \
     dalvik.vm.heapgrowthlimit?=192m \
     dalvik.vm.heapsize?=512m \
