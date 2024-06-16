@@ -1256,7 +1256,7 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest&& desiredMode) {
 
     if (mDeferRefreshRateWhenOff && display->getPowerMode() == hal::PowerMode::OFF) {
         ALOGI("%s: deferring because display is powered off", __func__);
-        mLastActiveMode = request.mode;
+        mLastActiveMode = desiredMode.mode;
         return;
     }
 
@@ -6135,7 +6135,7 @@ void SurfaceFlinger::setPowerModeInternal(const sp<DisplayDevice>& display, hal:
         getHwComposer().setPowerMode(displayId, mode);
         if (mLastActiveMode) {
             ALOGI("Deferred active mode change pending, applying now");
-            setDesiredMode({mLastActiveMode.value()}, true);
+            setDesiredMode({mLastActiveMode.value(), .force = true});
             mLastActiveMode = std::nullopt;
         }
         if (mode != hal::PowerMode::DOZE_SUSPEND &&
