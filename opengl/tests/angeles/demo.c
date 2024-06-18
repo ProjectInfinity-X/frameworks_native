@@ -462,7 +462,7 @@ static void drawFadeQuad()
 // Called from the app framework.
 void appInit()
 {
-    int a;
+    unsigned int a;
 
     glEnable(GL_NORMALIZE);
     glEnable(GL_DEPTH_TEST);
@@ -492,7 +492,7 @@ void appInit()
 // Called from the app framework.
 void appDeinit()
 {
-    int a;
+    unsigned int a;
     for (a = 0; a < SUPERSHAPE_COUNT; ++a)
         freeGLObject(sSuperShapeObjects[a]);
     freeGLObject(sGroundPlane);
@@ -666,7 +666,7 @@ static void gluLookAt(GLfloat eyex, GLfloat eyey, GLfloat eyez,
         y[2] /= mag;
     }
 
-#define M(row,col)  m[col*4+row]
+#define M(row,col)  m[(col)*4+(row)]
     M(0, 0) = x[0];
     M(0, 1) = x[1];
     M(0, 2) = x[2];

@@ -17,24 +17,22 @@
 #ifndef ANDROID_EGL_IMPL_H
 #define ANDROID_EGL_IMPL_H
 
-#include <ctype.h>
-
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <EGL/eglplatform.h>
+
+#include "EGL/egldefs.h"
+#include "hooks.h"
 
 // ----------------------------------------------------------------------------
 namespace android {
 // ----------------------------------------------------------------------------
 
-struct gl_hooks_t;
 
-struct egl_connection_t
-{
-    void volatile *     dso;
-    gl_hooks_t *        hooks;
-    EGLint              major;
-    EGLint              minor;
-    int                 unavailable;
-};
+EGLAPI const GLubyte * egl_get_string_for_current_context(GLenum name);
+EGLAPI const GLubyte * egl_get_string_for_current_context(GLenum name, GLuint index);
+EGLAPI GLint egl_get_num_extensions_for_current_context();
+EGLAPI egl_connection_t* egl_get_connection();
 
 // ----------------------------------------------------------------------------
 }; // namespace android

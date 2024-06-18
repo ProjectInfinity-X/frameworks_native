@@ -1,21 +1,28 @@
 #ifndef __glplatform_h_
 #define __glplatform_h_
 
-/* $Revision: 7172 $ on $Date:: 2009-01-09 11:17:41 -0800 #$ */
-
 /*
- * This document is licensed under the SGI Free Software B License Version
- * 2.0. For details, see http://oss.sgi.com/projects/FreeB/ .
- */
+** Copyright (c) 2017 The Khronos Group Inc.
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**     http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
 
 /* Platform-specific types and definitions for OpenGL ES 1.X  gl.h
- * Last modified on 2008/12/19
  *
  * Adopters may modify khrplatform.h and this file to suit their platform.
- * You are encouraged to submit all modifications to the Khronos group so that
- * they can be included in future versions of this file.  Please submit changes
- * by sending them to the public Khronos Bugzilla (http://khronos.org/bugzilla)
- * by filing a bug against product "OpenGL-ES" component "Registry".
+ * Please contribute modifications back to Khronos as pull requests on the
+ * public github repository:
+ *      https://github.com/KhronosGroup/OpenGL-Registry
  */
 
 #include <KHR/khrplatform.h>
@@ -24,16 +31,8 @@
 #define GL_API      KHRONOS_APICALL
 #endif
 
-#if defined(ANDROID)
-
+#ifndef GL_APIENTRY
 #define GL_APIENTRY KHRONOS_APIENTRY
-
-// XXX: this should probably not be here
-#define GL_DIRECT_TEXTURE_2D_QUALCOMM               0x7E80
-
-// XXX: not sure how this is intended to be used
-#define GL_GLEXT_PROTOTYPES
-
 #endif
 
 #endif /* __glplatform_h_ */

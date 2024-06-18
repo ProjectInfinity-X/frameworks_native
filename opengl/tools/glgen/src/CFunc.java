@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2006 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 import java.util.*;
 
@@ -13,6 +28,7 @@ public class CFunc {
 
     boolean hasPointerArg = false;
     boolean hasTypedPointerArg = false;
+    boolean hasEGLHandleArg = false;
 
     public CFunc(String original) {
         this.original = original;
@@ -48,6 +64,9 @@ public class CFunc {
         if (argType.isTypedPointer()) {
             hasTypedPointerArg = true;
         }
+        if (argType.isEGLHandle()) {
+            hasEGLHandleArg = true;
+        }
     }
 
     public int getNumArgs() {
@@ -80,6 +99,11 @@ public class CFunc {
         return hasTypedPointerArg;
     }
 
+    public boolean hasEGLHandleArg() {
+        return hasEGLHandleArg;
+    }
+
+    @Override
     public String toString() {
         String s =  "Function " + fname + " returns " + ftype + ": ";
         for (int i = 0; i < argNames.size(); i++) {
@@ -109,35 +133,34 @@ public class CFunc {
             ftype.setIsPointer(true);
             fname = tokens[i++];
         }
-	
+
         cfunc.setName(fname);
         cfunc.setType(ftype);
-	
+
         while (i < tokens.length) {
             String tok = tokens[i++];
-	    
+
             if (tok.equals("(")) {
-                continue;
+                tok = tokens[i++];
+                if (tok.equals("void")) {
+                    break;
+                }
             }
             if (tok.equals(")")) {
                 break;
             }
 
             CType argType = new CType();
-	    
+
             String argTypeName = tok;
             String argName = "";
-	    
+
             if (argTypeName.equals("const")) {
                 argType.setIsConst(true);
                 argTypeName = tokens[i++];
             }
             argType.setBaseType(argTypeName);
 
-            if (argTypeName.equals("void")) {
-                break;
-            }
-	    
             argName = tokens[i++];
             if (argName.startsWith("*")) {
                 argType.setIsPointer(true);
@@ -146,7 +169,7 @@ public class CFunc {
             if (argName.endsWith(",")) {
                 argName = argName.substring(0, argName.length() - 1);
             }
-	    
+
             cfunc.addArgument(argName, argType);
         }
 

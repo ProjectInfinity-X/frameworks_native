@@ -15,83 +15,32 @@
  */
 
 #include <ui/PixelFormat.h>
-#include <pixelflinger/format.h>
 
+// ----------------------------------------------------------------------------
 namespace android {
+// ----------------------------------------------------------------------------
 
-size_t PixelFormatInfo::getScanlineSize(unsigned int width) const
-{
-    size_t size;
-    if ((components >= 6) && (components <= 8)) {
-        // YCbCr formats are differents.
-        size = (width * bitsPerPixel)>>3;
-    } else {
-        size = width * bytesPerPixel;
+uint32_t bytesPerPixel(PixelFormat format) {
+    switch (format) {
+        case PIXEL_FORMAT_RGBA_FP16:
+            return 8;
+        case PIXEL_FORMAT_RGBA_8888:
+        case PIXEL_FORMAT_RGBX_8888:
+        case PIXEL_FORMAT_BGRA_8888:
+        case PIXEL_FORMAT_RGBA_1010102:
+            return 4;
+        case PIXEL_FORMAT_RGB_888:
+            return 3;
+        case PIXEL_FORMAT_RGB_565:
+        case PIXEL_FORMAT_RGBA_5551:
+        case PIXEL_FORMAT_RGBA_4444:
+            return 2;
+        case PIXEL_FORMAT_R_8:
+            return 1;
     }
-    return size;
+    return 0;
 }
 
-ssize_t bytesPerPixel(PixelFormat format)
-{
-    PixelFormatInfo info;
-    status_t err = getPixelFormatInfo(format, &info);
-    return (err < 0) ? err : info.bytesPerPixel;
-}
-
-ssize_t bitsPerPixel(PixelFormat format)
-{
-    PixelFormatInfo info;
-    status_t err = getPixelFormatInfo(format, &info);
-    return (err < 0) ? err : info.bitsPerPixel;
-}
-
-status_t getPixelFormatInfo(PixelFormat format, PixelFormatInfo* info)
-{
-    if (format < 0)
-        return BAD_VALUE;
-
-    if (info->version != sizeof(PixelFormatInfo))
-        return INVALID_OPERATION;
-
-    size_t numEntries;
-    const GGLFormat *i = gglGetPixelFormatTable(&numEntries) + format;
-    bool valid = uint32_t(format) < numEntries;
-    if (!valid) {
-        return BAD_INDEX;
-    }
-    
-    #define COMPONENT(name) \ 
-        case GGL_##name: info->components = PixelFormatInfo::name; break;
-    
-    switch (i->components) {
-        COMPONENT(ALPHA)
-        COMPONENT(RGB)
-        COMPONENT(RGBA)
-        COMPONENT(LUMINANCE)
-        COMPONENT(LUMINANCE_ALPHA)
-        COMPONENT(Y_CB_CR_SP)
-        COMPONENT(Y_CB_CR_P)
-        COMPONENT(Y_CB_CR_I)
-        default:
-            return BAD_INDEX;
-    }
-    
-    #undef COMPONENT
-    
-    info->format = format;
-    info->bytesPerPixel = i->size;
-    info->bitsPerPixel  = i->bitsPerPixel;
-    info->h_alpha       = i->ah;
-    info->l_alpha       = i->al;
-    info->h_red         = i->rh;
-    info->l_red         = i->rl;
-    info->h_green       = i->gh;
-    info->l_green       = i->gl;
-    info->h_blue        = i->bh;
-    info->l_blue        = i->bl;
-
-    return NO_ERROR;
-}
-
+// ----------------------------------------------------------------------------
 }; // namespace android
-
+// ----------------------------------------------------------------------------
