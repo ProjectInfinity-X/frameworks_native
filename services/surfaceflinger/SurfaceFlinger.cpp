@@ -493,6 +493,8 @@ SurfaceFlinger::SurfaceFlinger(Factory& factory) : SurfaceFlinger(factory, SkipI
     bool supportsBlurs = atoi(value);
     mSupportsBlur = supportsBlurs;
     ALOGI_IF(!mSupportsBlur, "Disabling blur effects, they are not supported.");
+    property_get("ro.sf.blurs_are_expensive", value, "0");
+    mBlursAreExpensive = atoi(value);
 
     property_get("debug.sf.luma_sampling", value, "1");
     mLumaSampling = atoi(value);
@@ -2760,6 +2762,7 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
     refreshArgs.updatingOutputGeometryThisFrame = mVisibleRegionsDirty;
     refreshArgs.updatingGeometryThisFrame = mGeometryDirty.exchange(false) || mVisibleRegionsDirty;
     refreshArgs.internalDisplayRotationFlags = getActiveDisplayRotationFlags();
+    refreshArgs.blursAreExpensive = mBlursAreExpensive;
 
     if (CC_UNLIKELY(mDrawingState.colorMatrixChanged)) {
         refreshArgs.colorTransformMatrix = mDrawingState.colorMatrix;

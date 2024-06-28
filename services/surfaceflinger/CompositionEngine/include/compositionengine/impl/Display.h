@@ -61,7 +61,7 @@ public:
     bool getSkipColorTransform() const override;
     compositionengine::Output::FrameFences presentFrame() override;
     void setExpensiveRenderingExpected(bool) override;
-    void finishFrame(GpuCompositionResult&&) override;
+    void finishFrame(const CompositionRefreshArgs&, GpuCompositionResult&&) override;
     bool supportsOffloadPresent() const override;
 
     // compositionengine::Display overrides

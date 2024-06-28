@@ -467,13 +467,13 @@ ftl::Future<std::monostate> Output::present(
     GpuCompositionResult result;
     const bool predictCompositionStrategy = canPredictCompositionStrategy(refreshArgs);
     if (predictCompositionStrategy) {
-        result = prepareFrameAsync();
+        result = prepareFrameAsync(refreshArgs);
     } else {
         prepareFrame();
     }
 
     devOptRepaintFlash(refreshArgs);
-    finishFrame(std::move(result));
+    finishFrame(refreshArgs, std::move(result));
     ftl::Future<std::monostate> future;
     if (mOffloadPresent) {
         future = presentFrameAndReleaseLayersAsync();
@@ -1161,7 +1161,7 @@ std::future<bool> Output::chooseCompositionStrategyAsync(
             [&, changes]() { return chooseCompositionStrategy(changes); });
 }
 
-GpuCompositionResult Output::prepareFrameAsync() {
+GpuCompositionResult Output::prepareFrameAsync(const CompositionRefreshArgs& refreshArgs) {
     ATRACE_CALL();
     ALOGV(__FUNCTION__);
     auto& state = editState();
@@ -1181,7 +1181,7 @@ GpuCompositionResult Output::prepareFrameAsync() {
     GpuCompositionResult compositionResult;
     if (dequeueSucceeded) {
         std::optional<base::unique_fd> optFd =
-                composeSurfaces(Region::INVALID_REGION, buffer, bufferFence);
+                composeSurfaces(Region::INVALID_REGION, refreshArgs, buffer, bufferFence);
         if (optFd) {
             compositionResult.fence = std::move(*optFd);
         }
@@ -1219,7 +1219,7 @@ void Output::devOptRepaintFlash(const compositionengine::CompositionRefreshArgs&
             std::shared_ptr<renderengine::ExternalTexture> buffer;
             updateProtectedContentState();
             dequeueRenderBuffer(&bufferFence, &buffer);
-            static_cast<void>(composeSurfaces(dirtyRegion, buffer, bufferFence));
+            static_cast<void>(composeSurfaces(dirtyRegion, refreshArgs, buffer, bufferFence));
             mRenderSurface->queueBuffer(base::unique_fd(), getHdrSdrRatio(buffer));
         }
     }
@@ -1231,7 +1231,7 @@ void Output::devOptRepaintFlash(const compositionengine::CompositionRefreshArgs&
     prepareFrame();
 }
 
-void Output::finishFrame(GpuCompositionResult&& result) {
+void Output::finishFrame(const CompositionRefreshArgs& refreshArgs, GpuCompositionResult&& result) {
     ATRACE_CALL();
     ALOGV(__FUNCTION__);
     const auto& outputState = getState();
@@ -1256,7 +1256,7 @@ void Output::finishFrame(GpuCompositionResult&& result) {
         }
         // Repaint the framebuffer (if needed), getting the optional fence for when
         // the composition completes.
-        optReadyFence = composeSurfaces(Region::INVALID_REGION, buffer, bufferFence);
+        optReadyFence = composeSurfaces(Region::INVALID_REGION, refreshArgs, buffer, bufferFence);
     }
     if (!optReadyFence) {
         return;
@@ -1320,8 +1320,8 @@ bool Output::dequeueRenderBuffer(base::unique_fd* bufferFence,
 }
 
 std::optional<base::unique_fd> Output::composeSurfaces(
-        const Region& debugRegion, std::shared_ptr<renderengine::ExternalTexture> tex,
-        base::unique_fd& fd) {
+        const Region& debugRegion, const compositionengine::CompositionRefreshArgs& refreshArgs,
+        std::shared_ptr<renderengine::ExternalTexture> tex, base::unique_fd& fd) {
     ATRACE_CALL();
     ALOGV(__FUNCTION__);
 
@@ -1378,7 +1378,9 @@ std::optional<base::unique_fd> Output::composeSurfaces(
     // or complex GPU shaders and it's expensive. We boost the GPU frequency so that
     // GPU composition can finish in time. We must reset GPU frequency afterwards,
     // because high frequency consumes extra battery.
-    const bool expensiveRenderingExpected = mLayerRequestingBackgroundBlur != nullptr ||
+    const bool expensiveBlurs =
+            refreshArgs.blursAreExpensive && mLayerRequestingBackgroundBlur != nullptr;
+    const bool expensiveRenderingExpected = expensiveBlurs ||
             std::any_of(clientCompositionLayers.begin(), clientCompositionLayers.end(),
                         [outputDataspace =
                                  clientCompositionDisplay.outputDataspace](const auto& layer) {

@@ -98,10 +98,11 @@ public:
     void updateColorProfile(const compositionengine::CompositionRefreshArgs&) override;
     void beginFrame() override;
     void prepareFrame() override;
-    GpuCompositionResult prepareFrameAsync() override;
+    GpuCompositionResult prepareFrameAsync(const CompositionRefreshArgs&) override;
     void devOptRepaintFlash(const CompositionRefreshArgs&) override;
-    void finishFrame(GpuCompositionResult&&) override;
+    void finishFrame(const CompositionRefreshArgs&, GpuCompositionResult&&) override;
     std::optional<base::unique_fd> composeSurfaces(const Region&,
+                                                   const compositionengine::CompositionRefreshArgs&,
                                                    std::shared_ptr<renderengine::ExternalTexture>,
                                                    base::unique_fd&) override;
     void presentFrameAndReleaseLayers() override;
