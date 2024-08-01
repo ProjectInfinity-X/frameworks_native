@@ -272,6 +272,7 @@ cc_defaults {
         "-Wunused-result",
         "-DANDROID_BASE_UNIQUE_FD_DISABLE_IMPLICIT_CONVERSION",
         "-DANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION",
+        "-O3",
         // Hide symbols by default and set the BUILDING_LIBBINDER macro so that
         // the code knows to export them.
         "-fvisibility=hidden",
