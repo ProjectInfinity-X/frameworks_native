@@ -49,6 +49,7 @@
 #include <SkString.h>
 #include <SkSurface.h>
 #include <SkTileMode.h>
+#include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <common/FlagManager.h>
 #include <common/trace.h>
@@ -294,8 +295,14 @@ SkiaRenderEngine::SkiaRenderEngine(Threaded threaded, PixelFormat pixelFormat,
             break;
         }
         case BlurAlgorithm::KAWASE: {
-            ALOGD("Background Blurs Enabled (Glass / Kawase variant)");
-            mBlurFilter = new GlassBlurFilter();
+            bool glassBlurEnabled = android::base::GetBoolProperty("persist.sys.glassblur.enabled", false);
+            if (glassBlurEnabled) {
+                ALOGD("Background Blurs Enabled (Glass / Kawase variant)");
+                mBlurFilter = new GlassBlurFilter();
+            } else {
+                ALOGD("Background Blurs Enabled (Kawase algorithm)");
+                mBlurFilter = new KawaseBlurFilter();
+            }
             break;
         }
         case BlurAlgorithm::KAWASE_DUAL_FILTER: {
