@@ -1387,14 +1387,10 @@ void BLASTBufferQueue::updateBufferReleaseProducer() {
     // SELinux policy may prevent this process from sending the BufferReleaseChannel's file
     // descriptor to SurfaceFlinger, causing the entire transaction to be dropped. We send this
     // transaction independently of any other updates to ensure those updates aren't lost.
-    SurfaceComposerClient::Transaction t;
-    status_t status = t.setApplyToken(mApplyToken)
-                              .setBufferReleaseChannel(mSurfaceControl, mBufferReleaseProducer)
-                              .apply(false /* synchronous */, true /* oneWay */);
-    if (status != OK) {
-        ALOGW("[%s] %s - failed to set buffer release channel on %s", mName.c_str(),
-              statusToString(status).c_str(), mSurfaceControl->getName().c_str());
-    }
+    SurfaceComposerClient::Transaction()
+            .setApplyToken(mApplyToken)
+            .setBufferReleaseChannel(mSurfaceControl, mBufferReleaseProducer)
+            .apply(false /* synchronous */, true /* oneWay */);
 }
 
 void BLASTBufferQueue::drainBufferReleaseConsumer() {
