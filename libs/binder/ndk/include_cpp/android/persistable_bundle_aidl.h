@@ -246,14 +246,11 @@ class PersistableBundle {
         if (API_LEVEL_AT_LEAST(__ANDROID_API_V__)) {
             int32_t num = vec.size();
             if (num > 0) {
-                char** inVec = (char**)malloc(num * sizeof(char*));
-                if (inVec) {
-                    for (int32_t i = 0; i < num; i++) {
-                        inVec[i] = strdup(vec[i].c_str());
-                    }
-                    APersistableBundle_putStringVector(mPBundle, key.c_str(), inVec, num);
-                    free(inVec);
+                std::vector<const char*> inVec(num);
+                for (int32_t i = 0; i < num; i++) {
+                    inVec[i] = vec[i].c_str();
                 }
+                APersistableBundle_putStringVector(mPBundle, key.c_str(), inVec.data(), num);
             }
         }
     }
@@ -306,6 +303,7 @@ class PersistableBundle {
                                                     &stringAllocator, nullptr);
             if (ret && outString) {
                 *val = std::string(outString);
+                free(outString);
             }
             return ret;
         } else {
