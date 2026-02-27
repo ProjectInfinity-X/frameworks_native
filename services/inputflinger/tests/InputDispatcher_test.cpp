@@ -7591,6 +7591,83 @@ TEST_F(InputDispatcherTest, TransferTouchOnDisplay_CloneSurface) {
     secondWindowInSecondary->consumeMotionUp(SECOND_DISPLAY_ID, MotionFlag::NO_FOCUS_CHANGE);
 }
 
+/**
+ * When a focused window is moved from one display to another, it should either maintain focus,
+ * or it should lose it and then gain it again.
+ * This test reproduces a bug in the dispatcher - currently, even though dispatcher still thinks
+ * that the window has focus after it's been moved, the last event that's written to the window's
+ * input channel is focusEvent(hasFocus=false).
+ */
+TEST_F(InputDispatcherTest, Focus_WindowMovedToAnotherDisplay_LosesFocus) {
+    static constexpr auto DEFAULT = ui::LogicalDisplayId::DEFAULT;
+    static constexpr auto EXTERNAL = ui::LogicalDisplayId{7};
+
+    std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
+    sp<FakeWindowHandle> window =
+            sp<FakeWindowHandle>::make(application, mDispatcher, "Window", EXTERNAL);
+    window->setFocusable(true);
+
+    // Add another focusable window onto DEFAULT display
+    sp<FakeWindowHandle> unrelatedWindow =
+            sp<FakeWindowHandle>::make(application, mDispatcher, "Unrelated Window", DEFAULT);
+
+    mDispatcher->setFocusedApplication(EXTERNAL, application);
+    mDispatcher->setFocusedDisplay(EXTERNAL);
+    mDispatcher->onWindowInfosChanged(
+            {{*unrelatedWindow->getInfo(), *window->getInfo()}, {}, 0, 0});
+
+    // Window initially gets focus on the external display.
+    setFocusedWindow(window);
+    ASSERT_NO_FATAL_FAILURE(window->consumeFocusEvent(true));
+
+    // Display-unspecified keys are sent to this window
+    mDispatcher->notifyKey(KeyArgsBuilder(AKEY_EVENT_ACTION_DOWN, AINPUT_SOURCE_KEYBOARD)
+                                   .displayId(ui::LogicalDisplayId::INVALID)
+                                   .build());
+    mDispatcher->notifyKey(KeyArgsBuilder(AKEY_EVENT_ACTION_UP, AINPUT_SOURCE_KEYBOARD)
+                                   .displayId(ui::LogicalDisplayId::INVALID)
+                                   .build());
+    window->consumeKeyEvent(AllOf(WithKeyAction(AKEY_EVENT_ACTION_DOWN),
+                                  WithDisplayId(ui::LogicalDisplayId::INVALID)));
+    window->consumeKeyEvent(AllOf(WithKeyAction(AKEY_EVENT_ACTION_UP),
+                                  WithDisplayId(ui::LogicalDisplayId::INVALID)));
+
+    // Now move window to another display. This won't actually happen until "onWindowInfosChanged"
+    // is fired.
+    window->editInfo()->displayId = DEFAULT;
+
+    mDispatcher->setFocusedApplication(ui::LogicalDisplayId::DEFAULT, application);
+
+    // Request focus on the default display.
+    mDispatcher->setFocusedDisplay(ui::LogicalDisplayId::DEFAULT);
+    setFocusedWindow(window);
+
+    // Not sure how this next call is ordered relative to the setFocusedWindow in practice.
+    mDispatcher->onWindowInfosChanged(
+            {{*unrelatedWindow->getInfo(), *window->getInfo()}, {}, 0, 0});
+
+    // Window gains focus on the new display.
+    ASSERT_NO_FATAL_FAILURE(window->consumeFocusEvent(true));
+
+    // TODO(b/438569310)
+    // BUG: the last event that is written to the window is FocusEvent(hasFocus=false)
+    ASSERT_NO_FATAL_FAILURE(window->consumeFocusEvent(false));
+
+    // The key is still delivered to the window correctly.
+    mDispatcher->notifyKey(KeyArgsBuilder(AKEY_EVENT_ACTION_DOWN, AINPUT_SOURCE_KEYBOARD)
+                                   .displayId(ui::LogicalDisplayId::INVALID)
+                                   .build());
+    mDispatcher->notifyKey(KeyArgsBuilder(AKEY_EVENT_ACTION_UP, AINPUT_SOURCE_KEYBOARD)
+                                   .displayId(ui::LogicalDisplayId::INVALID)
+                                   .build());
+    window->consumeKeyEvent(AllOf(WithKeyAction(AKEY_EVENT_ACTION_DOWN),
+                                  WithDisplayId(ui::LogicalDisplayId::INVALID)));
+    window->consumeKeyEvent(AllOf(WithKeyAction(AKEY_EVENT_ACTION_UP),
+                                  WithDisplayId(ui::LogicalDisplayId::INVALID)));
+
+    window->assertNoEvents();
+}
+
 TEST_F(InputDispatcherTest, FocusedWindow_ReceivesFocusEventAndKeyEvent) {
     std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
     sp<FakeWindowHandle> window =

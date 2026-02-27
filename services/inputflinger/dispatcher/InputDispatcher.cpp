@@ -7201,9 +7201,8 @@ void InputDispatcher::onWindowInfosChanged(const gui::WindowInfosUpdate& update)
     };
     // The listener sends the windows as a flattened array. Separate the windows by display for
     // more convenient parsing.
-    std::unordered_map<ui::LogicalDisplayId, std::vector<sp<WindowInfoHandle>>> handlesPerDisplay;
+    std::map<ui::LogicalDisplayId, std::vector<sp<WindowInfoHandle>>> handlesPerDisplay;
     for (const auto& info : update.windowInfos) {
-        handlesPerDisplay.emplace(info.displayId, std::vector<sp<WindowInfoHandle>>());
         handlesPerDisplay[info.displayId].push_back(sp<WindowInfoHandle>::make(info));
     }
 
