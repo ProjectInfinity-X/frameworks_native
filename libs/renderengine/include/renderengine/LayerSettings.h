@@ -66,6 +66,8 @@ struct Buffer {
     // ignored.
     std::shared_ptr<ExternalTexture> buffer = nullptr;
 
+    uint64_t frameNumber = 0;
+
     // Fence that will fire when the buffer is ready to be bound.
     sp<Fence> fence = nullptr;
 
@@ -201,7 +203,8 @@ struct LayerSettings {
 // Keep in sync with custom comparison function in
 // compositionengine/impl/ClientCompositionRequestCache.cpp
 static inline bool operator==(const Buffer& lhs, const Buffer& rhs) {
-    return lhs.buffer == rhs.buffer && lhs.fence == rhs.fence &&
+    return lhs.buffer == rhs.buffer && lhs.frameNumber == rhs.frameNumber &&
+            lhs.fence == rhs.fence &&
             lhs.useTextureFiltering == rhs.useTextureFiltering &&
             lhs.textureTransform == rhs.textureTransform &&
             lhs.usePremultipliedAlpha == rhs.usePremultipliedAlpha &&
@@ -247,6 +250,7 @@ static inline void PrintTo(const Buffer& settings, ::std::ostream* os,
     const std::string newline = IndentedNewline(currentIndent + 1);
     *os << "Buffer {";
     *os << newline << ".buffer = " << *settings.buffer.get();
+    *os << newline << ".frameNumber = " << settings.frameNumber;
     *os << newline << ".fence = " << settings.fence.get();
     *os << newline << ".useTextureFiltering = " << settings.useTextureFiltering;
     *os << newline << ".textureTransform = ";
