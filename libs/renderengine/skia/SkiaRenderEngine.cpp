@@ -86,6 +86,7 @@
 #include "filters/BlurFilter.h"
 #include "filters/GainmapFactory.h"
 #include "filters/GaussianBlurFilter.h"
+#include "filters/GlassBlurFilter.h"
 #include "filters/KawaseBlurDualFilterV2.h"
 #include "filters/KawaseBlurFilter.h"
 #include "filters/LutShader.h"
@@ -344,14 +345,10 @@ SkiaRenderEngine::SkiaRenderEngine(Threaded threaded, PixelFormat pixelFormat,
             mBlurFilter = new GaussianBlurFilter(mRuntimeEffectManager);
             break;
         }
-        case BlurAlgorithm::Kawase: {
-            ALOGD("Background Blurs Enabled (Kawase algorithm)");
-            mBlurFilter = new KawaseBlurFilter(mRuntimeEffectManager);
-            break;
-        }
+        case BlurAlgorithm::Kawase:
         case BlurAlgorithm::KawaseDualFilterV2: {
-            ALOGD("Background Blurs Enabled (Kawase dual-filtering V2 algorithm)");
-            mBlurFilter = new KawaseBlurDualFilterV2(mRuntimeEffectManager);
+            ALOGD("Background Blurs Enabled (Glass blur / Kawase V2 variant)");
+            mBlurFilter = new GlassBlurFilter(mRuntimeEffectManager);
             break;
         }
     }
@@ -365,6 +362,8 @@ SkiaRenderEngine::~SkiaRenderEngine() { }
 // destroyed by subclasses.
 void SkiaRenderEngine::finishRenderingAndAbandonContexts() {
     std::lock_guard<std::mutex> lock(mRenderingMutex);
+
+    mBlurCache.clear();
 
     if (mBlurFilter) {
         delete mBlurFilter;
@@ -1114,6 +1113,67 @@ void SkiaRenderEngine::drawLayersInternal(
 
             // TODO(b/182216890): Filter out empty layers earlier
             if (blurRect.width() > 0 && blurRect.height() > 0) {
+                auto computeBlurInputHash = [&]() -> std::pair<bool, uint64_t> {
+                    uint64_t h = 14695981039346656037ULL;
+                    const auto mix = [&h](uint64_t v) {
+                        h ^= v;
+                        h *= 1099511628211ULL;
+                    };
+                    const auto mixFloat = [&mix](float f) {
+                        uint32_t bits;
+                        memcpy(&bits, &f, sizeof(f));
+                        mix(bits);
+                    };
+                    for (const auto& l : layers) {
+                        if (&l == &layer) break;
+                        if (l.source.buffer.buffer) {
+                            if (l.source.buffer.frameNumber == 0) {
+                                return {false, 0};
+                            }
+                            mix(l.source.buffer.buffer->getId());
+                            mix(l.source.buffer.frameNumber);
+                        }
+                        mixFloat(float(l.alpha));
+                        const auto& m = l.geometry.positionTransform;
+                        for (int r = 0; r < 4; ++r) {
+                            for (int c = 0; c < 4; ++c) {
+                                mixFloat(float(m[r][c]));
+                            }
+                        }
+                        const auto& b = l.geometry.boundaries;
+                        mixFloat(b.left);
+                        mixFloat(b.top);
+                        mixFloat(b.right);
+                        mixFloat(b.bottom);
+                    }
+                    return {true, h};
+                };
+
+                auto lookupBlurCache = [&](uint32_t radius, const SkIRect& rect,
+                                           uint64_t inputHash) -> sk_sp<SkImage> {
+                    for (auto it = mBlurCache.begin(); it != mBlurCache.end(); ++it) {
+                        if (it->blurRadius == radius && it->inputHash == inputHash &&
+                            it->blurRect == rect) {
+                            sk_sp<SkImage> img = it->image;
+                            if (it != mBlurCache.begin()) {
+                                BlurCacheEntry entry = std::move(*it);
+                                mBlurCache.erase(it);
+                                mBlurCache.push_front(std::move(entry));
+                            }
+                            return img;
+                        }
+                    }
+                    return nullptr;
+                };
+
+                auto storeBlurCache = [&](sk_sp<SkImage> image, uint32_t radius,
+                                          const SkIRect& rect, uint64_t inputHash) {
+                    mBlurCache.push_front({std::move(image), inputHash, radius, rect});
+                    if (mBlurCache.size() > kBlurCacheMaxEntries) {
+                        mBlurCache.pop_back();
+                    }
+                };
+
                 // if multiple layers have blur, then we need to take a snapshot now because
                 // only the lowest layer will have blurImage populated earlier
                 if (!blurInput) {
@@ -1137,18 +1197,29 @@ void SkiaRenderEngine::drawLayersInternal(
                     }
                 }
 
+                const SkIRect blurRectI = blurRect.roundOut();
+                const auto [cacheableBlurInput, blurInputHash] = computeBlurInputHash();
+
                 sk_sp<SkImage> temporaryBlurredImage = nullptr; // Might be reused by blur regions.
                 if (layer.backgroundBlurRadius > 0) {
+                    const uint32_t blurRadius =
+                            mBlurFilter->effectiveRadius(layer.backgroundBlurRadius);
                     SFTRACE_NAME("BackgroundBlur");
-                    // Result is only valid until the next call to generateTemporaryImage (for a
-                    // given BlurFilter). Safe to invalidate after all desired drawBlurRegion
-                    // invocations have been made for a particular blurred SkImage.
-                    temporaryBlurredImage =
-                            mBlurFilter->generateTemporaryImage(context, display,
-                                                                layer.backgroundBlurRadius,
-                                                                blurInput, blurRect);
+                    sk_sp<SkImage> blurredImage;
+                    if (cacheableBlurInput) {
+                        blurredImage = lookupBlurCache(blurRadius, blurRectI, blurInputHash);
+                    }
+                    if (!blurredImage) {
+                        blurredImage =
+                                mBlurFilter->generateTemporaryImage(context, display, blurRadius,
+                                                                    blurInput, blurRect);
+                        if (cacheableBlurInput) {
+                            storeBlurCache(blurredImage, blurRadius, blurRectI, blurInputHash);
+                        }
+                    }
+                    temporaryBlurredImage = blurredImage;
 
-                    mBlurFilter->drawBlurRegion(canvas, bounds, layer.backgroundBlurRadius,
+                    mBlurFilter->drawBlurRegion(canvas, bounds, blurRadius,
                                                 layer.backgroundBlurScale, 1.0f, blurRect,
                                                 temporaryBlurredImage, blurInput);
                 }
@@ -1164,8 +1235,9 @@ void SkiaRenderEngine::drawLayersInternal(
                     using BlurRegionList = ftl::SmallVector<BlurRegion, 4>;
                     ftl::SmallMap<uint32_t, BlurRegionList, 2> regionsPerRadius;
                     for (const BlurRegion& region : layer.blurRegions) {
-                        if (region.blurRadius > 0) {
-                            const auto& [entry, _] = regionsPerRadius.try_emplace(region.blurRadius,
+                        const uint32_t blurRadius = mBlurFilter->effectiveRadius(region.blurRadius);
+                        if (blurRadius > 0) {
+                            const auto& [entry, _] = regionsPerRadius.try_emplace(blurRadius,
                                                                                   BlurRegionList());
                             entry->second.push_back(region);
                         }
@@ -1173,35 +1245,47 @@ void SkiaRenderEngine::drawLayersInternal(
 
                     const auto drawRegion =
                             [this, canvas, &blurRect,
-                             &blurInput](const sk_sp<SkImage>& temporaryBlurredImage,
+                             &blurInput](const sk_sp<SkImage>& blurredImage,
+                                         const uint32_t blurRadius,
                                          const BlurRegion& region) {
                                 mBlurFilter->drawBlurRegion(canvas, getBlurRRect(region),
-                                                            region.blurRadius, 1.0f, region.alpha,
-                                                            blurRect, temporaryBlurredImage,
+                                                            blurRadius, 1.0f, region.alpha,
+                                                            blurRect, blurredImage,
                                                             blurInput);
                             };
+
+                    const uint32_t bgBlurRadius = layer.backgroundBlurRadius > 0
+                            ? mBlurFilter->effectiveRadius(layer.backgroundBlurRadius)
+                            : 0;
 
                     // Reuse existing temporaryBlurredImage from background blur for any regions
                     // with the same blur radius.
                     if (temporaryBlurredImage != nullptr &&
-                        regionsPerRadius.contains(layer.backgroundBlurRadius)) {
+                        regionsPerRadius.contains(bgBlurRadius)) {
                         for (const BlurRegion& region :
-                             regionsPerRadius.get(layer.backgroundBlurRadius)->get()) {
-                            drawRegion(temporaryBlurredImage, region);
+                             regionsPerRadius.get(bgBlurRadius)->get()) {
+                            drawRegion(temporaryBlurredImage, bgBlurRadius, region);
                         }
-                        regionsPerRadius.erase(layer.backgroundBlurRadius);
+                        regionsPerRadius.erase(bgBlurRadius);
                     }
 
                     // Draw remaining regions for each blur radius.
                     for (const auto& [radius, regions] : regionsPerRadius) {
-                        {
+                        sk_sp<SkImage> blurredImage;
+                        if (cacheableBlurInput) {
+                            blurredImage = lookupBlurCache(radius, blurRectI, blurInputHash);
+                        }
+                        if (!blurredImage) {
                             SFTRACE_NAME("BlurRegion");
-                            temporaryBlurredImage =
+                            blurredImage =
                                     mBlurFilter->generateTemporaryImage(context, display, radius,
                                                                         blurInput, blurRect);
+                            if (cacheableBlurInput) {
+                                storeBlurCache(blurredImage, radius, blurRectI, blurInputHash);
+                            }
                         }
                         for (const BlurRegion& region : regions) {
-                            drawRegion(temporaryBlurredImage, region);
+                            drawRegion(blurredImage, radius, region);
                         }
                     }
                 }
@@ -1754,6 +1838,11 @@ void SkiaRenderEngine::drawShadow(SkCanvas* canvas,
 }
 
 void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
+    {
+        std::lock_guard<std::mutex> lock(mRenderingMutex);
+        mBlurCache.clear();
+    }
+
     // This cache multiplier was selected based on review of cache sizes relative
     // to the screen resolution. Looking at the worst case memory needed by blur (~1.5x),
     // shadows (~1x), and general data structures (e.g. vertex buffers) we selected this as a

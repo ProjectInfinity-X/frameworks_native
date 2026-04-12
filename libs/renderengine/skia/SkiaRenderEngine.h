@@ -33,6 +33,8 @@
 #include <renderengine/RenderEngine.h>
 #include <sys/types.h>
 
+#include <deque>
+
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -247,6 +249,15 @@ private:
 
     sp<Fence> mLastDrawFence;
     BlurFilter* mBlurFilter = nullptr;
+
+    struct BlurCacheEntry {
+        sk_sp<SkImage> image;
+        uint64_t inputHash;
+        uint32_t blurRadius;
+        SkIRect blurRect;
+    };
+    static constexpr size_t kBlurCacheMaxEntries = 4;
+    std::deque<BlurCacheEntry> mBlurCache;
 
     // Object to capture commands send to Skia.
     std::unique_ptr<SkiaCapture> mCapture;
