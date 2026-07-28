@@ -28,6 +28,7 @@
 #include <gui/BufferQueueConsumer.h>
 #include <gui/BufferQueueCore.h>
 #include <gui/BufferQueueProducer.h>
+#include <atomic>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 
@@ -81,11 +82,11 @@ timespec timespecFromNanos(nsecs_t duration) {
 
 inline int epoll_wait_with_timeout(int epfd, struct epoll_event* events, int maxevents,
                                    const timespec* timeout) {
-    static bool useEpollWait = false;
-    if (!useEpollWait) {
+    static std::atomic<bool> useEpollWait = false;
+    if (!useEpollWait.load(std::memory_order_relaxed)) {
         int ret = epoll_pwait2(epfd, events, maxevents, timeout, nullptr);
         if (ret == -1 && errno == ENOSYS) {
-            useEpollWait = true;
+            useEpollWait.store(true, std::memory_order_relaxed);
         } else {
             return ret;
         }
@@ -93,7 +94,13 @@ inline int epoll_wait_with_timeout(int epfd, struct epoll_event* events, int max
 
     int timeoutMs = -1;
     if (timeout) {
-        timeoutMs = (timeout->tv_sec * 1000) + (timeout->tv_nsec / 1000000);
+        int64_t ms = (static_cast<int64_t>(timeout->tv_sec) * 1000) +
+                     (timeout->tv_nsec + 999999) / 1000000;
+        if (ms > INT_MAX) {
+            timeoutMs = INT_MAX;
+        } else {
+            timeoutMs = static_cast<int>(ms);
+        }
     }
     return epoll_wait(epfd, events, maxevents, timeoutMs);
 }
