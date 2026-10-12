@@ -94,6 +94,85 @@ const SkString kEffectSource_GlassBlurFilter_FinalUpSampleEffect(
         "    return half4(c * half(0.125), half(1.0));\n"
         "}");
 
+const SkString kEffectSource_KawaseBlurEffect(
+        "uniform shader child;"
+        "uniform float in_blurOffset;"
+
+        "half4 main(float2 xy) {"
+        "half4 c = child.eval(xy);"
+        "c += child.eval(xy + float2(+in_blurOffset, +in_blurOffset));"
+        "c += child.eval(xy + float2(+in_blurOffset, -in_blurOffset));"
+        "c += child.eval(xy + float2(-in_blurOffset, -in_blurOffset));"
+        "c += child.eval(xy + float2(-in_blurOffset, +in_blurOffset));"
+        "return half4(c.rgb * 0.2, 1.0);"
+        "}");
+
+const SkString kEffectSource_KawaseBlurDualFilterV2_QuarterResDownSampleBlurEffect(R"(
+    uniform shader child;
+
+    const float2 STEP_0 = float2( 0.25, 0.25);
+    const float2 STEP_1 = float2( 0.25, -0.25);
+    const float2 STEP_2 = float2(-0.25, -0.25);
+    const float2 STEP_3 = float2(-0.25, 0.25);
+
+    half4 main(float2 xy) {
+        half3 c = child.eval(xy + STEP_0).rgb;
+        c += child.eval(xy + STEP_1).rgb;
+        c += child.eval(xy + STEP_2).rgb;
+        c += child.eval(xy + STEP_3).rgb;
+
+        return half4(c * 0.25, 1.0);
+    }
+)");
+
+const SkString kEffectSource_KawaseBlurDualFilterV2_HalfResDownSampleBlurEffect(R"(
+    uniform shader child;
+
+    const float2 STEP_0 = float2( 0.5, 0.5);
+    const float2 STEP_1 = float2( 0.5, -0.5);
+    const float2 STEP_2 = float2(-0.5, -0.5);
+    const float2 STEP_3 = float2(-0.5, 0.5);
+
+    half4 main(float2 xy) {
+        half3 c = child.eval(xy).rgb * 4.0;
+        c += child.eval(xy + STEP_0).rgb;
+        c += child.eval(xy + STEP_1).rgb;
+        c += child.eval(xy + STEP_2).rgb;
+        c += child.eval(xy + STEP_3).rgb;
+
+        return half4(c * 0.125, 1.0);
+    }
+)");
+
+const SkString kEffectSource_KawaseBlurDualFilterV2_UpSampleBlurEffect(R"(
+    uniform shader child;
+    uniform float in_blurOffset;
+    uniform float in_crossFade;
+    uniform float in_weightedCrossFade;
+
+    const float2 STEP_0 = float2( 1.0, 0.0);
+    const float2 STEP_1 = float2( 0.623489802,  0.781831482);
+    const float2 STEP_2 = float2(-0.222520934,  0.974927912);
+    const float2 STEP_3 = float2(-0.900968868,  0.433883739);
+    const float2 STEP_4 = float2( 0.900968868, -0.433883739);
+    const float2 STEP_5 = float2(-0.222520934, -0.974927912);
+    const float2 STEP_6 = float2(-0.623489802, -0.781831482);
+
+    half4 main(float2 xy) {
+        half3 c = child.eval(xy).rgb;
+
+        c += child.eval(xy + STEP_0 * in_blurOffset).rgb;
+        c += child.eval(xy + STEP_1 * in_blurOffset).rgb;
+        c += child.eval(xy + STEP_2 * in_blurOffset).rgb;
+        c += child.eval(xy + STEP_3 * in_blurOffset).rgb;
+        c += child.eval(xy + STEP_4 * in_blurOffset).rgb;
+        c += child.eval(xy + STEP_5 * in_blurOffset).rgb;
+        c += child.eval(xy + STEP_6 * in_blurOffset).rgb;
+
+        return half4(c * in_weightedCrossFade, in_crossFade);
+    }
+)");
+
 GlassBlurFilter::GlassBlurFilter(RuntimeEffectManager& effectManager)
       : BlurFilter(effectManager, 0.0f, BlurFilter::kInputScale) {
     mHalfResDownSampleBlurEffect =

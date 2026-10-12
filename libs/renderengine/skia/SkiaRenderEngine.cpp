@@ -88,8 +88,6 @@
 #include "filters/GainmapFactory.h"
 #include "filters/GaussianBlurFilter.h"
 #include "filters/GlassBlurFilter.h"
-#include "filters/KawaseBlurDualFilterV2.h"
-#include "filters/KawaseBlurFilter.h"
 #include "filters/LutShader.h"
 #include "filters/MouriMap.h"
 #include "filters/RuntimeEffectManager.h"
