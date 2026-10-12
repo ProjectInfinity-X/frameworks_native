@@ -1259,6 +1259,8 @@ void SkiaRenderEngine::drawLayersInternal(
                         memcpy(&bits, &f, sizeof(f));
                         mix(bits);
                     };
+                    mix(static_cast<uint32_t>(display.outputDataspace));
+                    mixFloat(display.maxLuminance);
                     for (const auto& l : layers) {
                         if (&l == &layer) break;
                         if (l.source.buffer.buffer) {
@@ -1268,6 +1270,9 @@ void SkiaRenderEngine::drawLayersInternal(
                             mix(l.source.buffer.buffer->getId());
                             mix(l.source.buffer.frameNumber);
                         }
+                        mixFloat(float(l.source.solidColor.r));
+                        mixFloat(float(l.source.solidColor.g));
+                        mixFloat(float(l.source.solidColor.b));
                         mixFloat(float(l.alpha));
                         const auto& m = l.geometry.positionTransform;
                         for (int r = 0; r < 4; ++r) {
