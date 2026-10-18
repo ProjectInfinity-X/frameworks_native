@@ -54,6 +54,21 @@ using SetPolicyResult = RefreshRateSelector::SetPolicyResult;
 using mock::createDisplayMode;
 using mock::createVrrDisplayMode;
 
+TEST(RefreshRateCategoryConfigTest, preservesConfiguredFrameRates) {
+#ifdef FRAME_RATE_CATEGORY_MIN
+    EXPECT_FLOAT_EQ(static_cast<float>(FRAME_RATE_CATEGORY_MIN),
+                    RefreshRateSelector::kMinSupportedFrameRate.getValue());
+#else
+    EXPECT_FLOAT_EQ(20.f, RefreshRateSelector::kMinSupportedFrameRate.getValue());
+#endif
+#ifdef FRAME_RATE_CATEGORY_HIGH
+    EXPECT_FLOAT_EQ(static_cast<float>(FRAME_RATE_CATEGORY_HIGH),
+                    RefreshRateSelector::kFrameRateCategoryRateHigh.getValue());
+#else
+    EXPECT_FLOAT_EQ(90.f, RefreshRateSelector::kFrameRateCategoryRateHigh.getValue());
+#endif
+}
+
 struct TestableRefreshRateSelector : RefreshRateSelector {
     using RefreshRateSelector::FrameRateRanking;
     using RefreshRateSelector::RefreshRateOrder;

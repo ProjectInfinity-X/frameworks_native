@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <array>
 #include <cstdint>
 #include <variant>
 
@@ -23,6 +24,7 @@
 #include <common/FlagManager.h>
 #include <common/test/FlagUtils.h>
 #include <compositionengine/LayerFECompositionState.h>
+#include <compositionengine/UdfpsExtension.h>
 #include <compositionengine/impl/Output.h>
 #include <compositionengine/impl/OutputCompositionState.h>
 #include <compositionengine/impl/OutputLayerCompositionState.h>
@@ -31,6 +33,7 @@
 #include <compositionengine/mock/LayerFE.h>
 #include <compositionengine/mock/OutputLayer.h>
 #include <compositionengine/mock/RenderSurface.h>
+#include <cutils/native_handle.h>
 #include <flag_macros.h>
 #include <ftl/future.h>
 #include <gtest/gtest.h>
@@ -40,6 +43,7 @@
 #include <renderengine/mock/RenderEngine.h>
 #include <ui/Rect.h>
 #include <ui/Region.h>
+#include <utils/NativeHandle.h>
 
 #include "CallOrderStateMachineHelper.h"
 #include "RegionMatcher.h"
@@ -5228,6 +5232,48 @@ TEST_F(OutputUpdateAndWriteCompositionStateTest, handlesBackgroundBlurRequests) 
     mOutput->updateCompositionState(args);
     mOutput->planComposition();
     mOutput->writeCompositionState(args);
+}
+
+struct OutputUdfpsCompositionTest : OutputTest {
+    void checkHigherLayer(bool hasProtectedContent, bool hasSidebandStream, bool requestsBlur,
+                          bool forceClientComposition) {
+        std::array<InjectedLayer, 3> layers;
+        EXPECT_CALL(*layers[1].layerFE, getDebugName())
+                .WillRepeatedly(Return(UDFPS_TOUCHED_LAYER_NAME));
+        layers[2].layerFEState.hasProtectedContent = hasProtectedContent;
+        if (hasSidebandStream) {
+            layers[2].layerFEState.sidebandStream =
+                    NativeHandle::create(native_handle_create(0, 0), true);
+        }
+        layers[2].layerFEState.backgroundBlurRadius = requestsBlur ? 10 : 0;
+        if (hasProtectedContent) {
+            EXPECT_CALL(mRenderEngine, supportsProtectedContent()).WillOnce(Return(false));
+        }
+        for (auto& layer : layers) {
+            layer.layerFEState.isOpaque = false;
+            EXPECT_CALL(*layer.outputLayer,
+                        updateCompositionState(false, forceClientComposition, ui::Transform::ROT_0,
+                                               _));
+            EXPECT_CALL(*layer.outputLayer, getOutput()).WillRepeatedly(ReturnRef(*mOutput));
+            injectOutputLayer(layer);
+        }
+        mOutput->editState().isEnabled = true;
+        CompositionRefreshArgs args;
+        args.updatingGeometryThisFrame = false;
+        mOutput->updateCompositionState(args);
+    }
+};
+
+TEST_F(OutputUdfpsCompositionTest, checksProtectedLayersAboveUdfps) {
+    checkHigherLayer(true, false, false, false);
+}
+
+TEST_F(OutputUdfpsCompositionTest, checksSidebandLayersAboveUdfps) {
+    checkHigherLayer(false, true, false, false);
+}
+
+TEST_F(OutputUdfpsCompositionTest, honorsBlurRequestsAboveUdfps) {
+    checkHigherLayer(false, false, true, true);
 }
 
 TEST_F(OutputUpdateAndWriteCompositionStateTest, handlesBlurRegionRequests) {

@@ -86,11 +86,13 @@ LegacyVirtualDisplaySurface::LegacyVirtualDisplaySurface(HWComposer& hwc,
     // with GPU. If the consumer needs CPU access, use the default format
     // set by the consumer. Otherwise allow gralloc to decide the format based
     // on usage bits.
-    int sinkUsage;
-    sink->query(NATIVE_WINDOW_CONSUMER_USAGE_BITS, &sinkUsage);
-    mSinkUsage |= (GRALLOC_USAGE_HW_COMPOSER | sinkUsage);
-    setOutputUsage(mSinkUsage);
-    if (sinkUsage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) {
+    const status_t usageStatus = mSource[SOURCE_SINK]->getConsumerUsage(&mSinkUsage);
+    if (usageStatus != NO_ERROR) {
+        VDS_LOGE("Unable to query consumer usage (%d)", usageStatus);
+        mSinkUsage = 0;
+    }
+    setOutputUsage(GRALLOC_USAGE_HW_COMPOSER);
+    if (mSinkUsage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) {
         int sinkFormat;
         sink->query(NATIVE_WINDOW_FORMAT, &sinkFormat);
         mDefaultOutputFormat = sinkFormat;
@@ -272,7 +274,9 @@ void LegacyVirtualDisplaySurface::onFrameCommitted() {
         int sslot = mapProducer2SourceSlot(SOURCE_SINK, mOutputProducerSlot);
         QueueBufferOutput qbo;
         VDS_LOGV("%s: queue sink sslot=%d", __func__, sslot);
-        if (retireFence->isValid() && mMustRecompose) {
+        // NO_FENCE means the work is already complete, so it must not suppress
+        // delivery of a recomposed frame to the consumer.
+        if (mMustRecompose) {
             status_t result =
                     mSource[SOURCE_SINK]
                             ->queueBuffer(sslot,
@@ -696,9 +700,8 @@ std::string LegacyVirtualDisplaySurface::toString(CompositionType type) {
 
 /* Helper to update the output usage when the display is secure */
 
-void LegacyVirtualDisplaySurface::setOutputUsage(uint64_t /*flag*/) {
-
-    mOutputUsage = mSinkUsage;
+void LegacyVirtualDisplaySurface::setOutputUsage(uint64_t usage) {
+    mOutputUsage = usage | mSinkUsage;
     if (mSecure && (mOutputUsage & GRALLOC_USAGE_HW_VIDEO_ENCODER)) {
         /*TODO: Currently, the framework can only say whether the display
          * and its subsequent session are secure or not. However, there is
