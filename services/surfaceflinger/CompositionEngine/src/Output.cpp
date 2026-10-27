@@ -1037,7 +1037,8 @@ compositionengine::OutputLayer* Output::findLayerRequestingBackgroundComposition
         if ((nextLayer != nullptr && layerRequestingBgComposition == nullptr) &&
             (strstr(nextLayer->getLayerFE().getDebugName(), UDFPS_TOUCHED_LAYER_NAME) != nullptr)) {
             layerRequestingBgComposition = layer;
-            break;
+            // Continue checking higher layers for sideband/protected content and
+            // background effects that require a higher client-composition boundary.
         }
     }
     return layerRequestingBgComposition;

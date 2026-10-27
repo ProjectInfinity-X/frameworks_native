@@ -40,24 +40,6 @@ namespace android::scheduler {
 
 using namespace std::chrono_literals;
 
-#if defined(FRAME_RATE_CATEGORY_HIGH) || defined(FRAME_RATE_CATEGORY_MIN)
-constexpr Fps intToFps(int val) {
-    switch(val) {
-        case 1: return 1_Hz;
-        case 2: return 2_Hz;
-        case 5: return 5_Hz;
-        case 10: return 10_Hz;
-        case 20: return 20_Hz;
-        case 30: return 30_Hz;
-        case 60: return 60_Hz;
-        case 90: return 90_Hz;
-        case 120: return 120_Hz;
-        case 144: return 144_Hz;
-        default: return 90_Hz; // fallback default
-    }
-}
-#endif
-
 // Selects the refresh rate of a display by ranking its `DisplayModes` in accordance with
 // the DisplayManager (or override) `Policy`, the `LayerRequirement` of each active layer,
 // and `GlobalSignals`.
@@ -69,14 +51,18 @@ public:
 
     // The lowest Render Frame Rate that will ever be selected
 #ifdef FRAME_RATE_CATEGORY_MIN
-    static constexpr Fps kMinSupportedFrameRate = intToFps(FRAME_RATE_CATEGORY_MIN);
+    static_assert(FRAME_RATE_CATEGORY_MIN > 0, "Minimum frame rate must be positive");
+    static constexpr Fps kMinSupportedFrameRate =
+            Fps::fromValue(static_cast<float>(FRAME_RATE_CATEGORY_MIN));
 #else
     static constexpr Fps kMinSupportedFrameRate = 20_Hz;
 #endif
 
     // Start range for FrameRateCategory Normal and High.
 #ifdef FRAME_RATE_CATEGORY_HIGH
-    static constexpr Fps kFrameRateCategoryRateHigh = intToFps(FRAME_RATE_CATEGORY_HIGH);
+    static_assert(FRAME_RATE_CATEGORY_HIGH > 0, "High frame rate must be positive");
+    static constexpr Fps kFrameRateCategoryRateHigh =
+            Fps::fromValue(static_cast<float>(FRAME_RATE_CATEGORY_HIGH));
 #else
     static constexpr Fps kFrameRateCategoryRateHigh = 90_Hz;
 #endif
